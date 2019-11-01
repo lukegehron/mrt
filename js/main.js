@@ -3,18 +3,23 @@ var camera, scene, renderer, raycaster, projector, INTERSECTED, directionalLight
 var surfaces = [];
 var mouse = new THREE.Vector2();
 
+//starting point for the occupant in the space
 mrt.occupant = {
     'position': {'x': 1, 'y': 1},
     'azimuth': 0.0,
     'posture': 'seated',
 };
 
+//starting values for the room size
 mrt.room = {
     'depth': 5.0,
     'width': 10.0,
     'height': 2.6,
 }
 
+//starting values for the room parameters
+//why are these not mrt.?
+//how much can I remove from wall2,3,4?
 params = {
     'azimuth': 0,
     'opacity': 0,
@@ -112,7 +117,7 @@ params = {
     'autoscale': true,
     'scaleMin': 20.0,
     'scaleMax': 40.0,
-    'setGlobalSurfaceTemp': 21,    
+    'setGlobalSurfaceTemp': 21,
     'update': function(){
       document.getElementById('calculating').style.display = "";
       setTimeout(function() {
@@ -126,6 +131,7 @@ var panelBorderMin = 0.1 // minimum distance from panel edge to surface edge
 var tempMax = 300; // highest temperature you can enter in the model
 var tempMin = -30; // lowest temperature you can enter in the model
 
+//assign parameters to wall mrt.walls.... why is it this way?
 function set_wall_properties(){
   mrt.walls = [
       {
@@ -197,11 +203,20 @@ function set_wall_properties(){
           'name': 'wall1panel1',
           'temperature': params.wall1.panel.temperature,
           'emissivity': params.wall1.panel.emissivity,
-          'u': params.wall1.panel.xposition,
+          'u': params.wall1.panel.xposition/2,
           'v': params.wall1.panel.yposition,
           'width': params.wall1.panel.width,
           'height': params.wall1.panel.height,
-      }
+      },//wow this actually worked! only for mrt in the shade... need to add the sun stuff
+      {
+        'name': 'wall1panel2',
+        'temperature': params.wall1.panel.temperature,
+        'emissivity': params.wall1.panel.emissivity,
+        'u': params.wall1.panel.xposition+2,
+        'v': params.wall1.panel.yposition,
+        'width': params.wall1.panel.width,
+        'height': params.wall1.panel.height,
+    }
     ];
   }
 
@@ -281,7 +296,8 @@ function set_wall_properties(){
   }
 
 };
-
+//generate geomerty points... not sure what the "zone" refers to...
+//doesn't actually draw anything just holds the verticies
 function gen_zone_geometry(){
 
     var wall1 = {
@@ -294,11 +310,14 @@ function gen_zone_geometry(){
         'name': 'wall1'
     };
     if (params.wall1.panel.active){
-      var u0 = params.wall1.panel.xposition;
-      var v0 = params.wall1.panel.yposition;
+      //changed to the array based method
+      var u0 = mrt.walls[0].subsurfaces[0].u;
+      var v0 = mrt.walls[0].subsurfaces[0].v;
+      var u1 = mrt.walls[0].subsurfaces[1].u;
+      var v1 = mrt.walls[0].subsurfaces[1].v;
       var w = Math.min(params.wall1.panel.width, mrt.room.width - (u0 + panelBorderMin));
       var h = Math.min(params.wall1.panel.height, mrt.room.height - (v0 + panelBorderMin));
-      wall1.children = [
+      wall1.children = [ //why are we calling these points "children"?? I guess it is the components that are children of the wall in the heierarchy....
         { 'vertices': [{'x': u0, 'y': v0, 'z': 0 },
                        {'x': u0, 'y': v0 + h, 'z': 0 },
                        {'x': u0 + w, 'y': v0 + h, 'z': 0 },
@@ -306,7 +325,15 @@ function gen_zone_geometry(){
           'radiant_t': params.wall1.panel.temperature,
           'emissivity': params.wall1.panel.emissivity,
           'name': 'wall1panel1'
-        },
+        },//added a second window
+        { 'vertices': [{'x': u1, 'y': v1, 'z': 0 },
+                       {'x': u1, 'y': v1 + h, 'z': 0 },
+                       {'x': u1 + w, 'y': v1 + h, 'z': 0 },
+                       {'x': u1 + w, 'y': v1, 'z': 0 }],
+          'radiant_t': params.wall1.panel.temperature,
+          'emissivity': params.wall1.panel.emissivity,
+          'name': 'wall1panel2'
+        }
       ];
     } else {
       wall1.children = [];
@@ -460,6 +487,7 @@ function gen_zone_geometry(){
     return myZone;
 }
 
+//this draws the geometry... sort of.. needs the mesh function below?
 function wallPanelGeometry(vertices){
   var Nv = vertices.length;
   var geometry = new THREE.Geometry();
@@ -473,6 +501,7 @@ function wallPanelGeometry(vertices){
   return geometry;
 }
 
+//this actually creates the geometry? maybe it just adds the material to it?
 function wallPanelMesh(geometry){
   var material = new THREE.MeshPhongMaterial( {
       color: 0xffffff,
@@ -494,6 +523,8 @@ function wallPanelMesh(geometry){
   return mesh;
 }
 
+//this removes everything so it can be redrawn in the render_zone step.
+//objects are not updated, they are deleted and then drawn from scratch
 function remove_zone() {
   var objsToRemove = _.rest(scene.children, 3);
   _.each(objsToRemove, function( object ) {
@@ -501,17 +532,25 @@ function remove_zone() {
   });
 }
 
+//includes gen_zone_geometry function to update the verticies
+//includes wallPanelGeometry and wallPanelMesh to build "panels" (ie windows)
+//I think this is the entire build script?
+//draw grid on floor
+//draw surfaces
 function render_zone(){
 
-  // Grid
+  //updates all of the geometry with the values in parameter.
+  //assigns the geomerty to the variable z, which is a terrible name for a variable... just sayin'
+  //so we can now do a z.length to get the number of walls... which is obviously always 6... duh..
+  var z = gen_zone_geometry();
 
-  var step = 1;
+  // Grid
   var geometry = new THREE.Geometry();
-  for ( var i = 0; i <= mrt.room.depth; i += step ) {
+  for ( var i = 0; i <= mrt.room.depth; i++) {
     geometry.vertices.push( new THREE.Vector3( 0, 0, i ) );
     geometry.vertices.push( new THREE.Vector3( mrt.room.width, 0, i ) );
   }
-  for ( var i = 0; i <= mrt.room.width; i += step ) {
+  for ( var i = 0; i <= mrt.room.width; i++) {
     geometry.vertices.push( new THREE.Vector3( i, 0, 0 ) );
     geometry.vertices.push( new THREE.Vector3( i, 0, mrt.room.depth) );
   }
@@ -521,15 +560,15 @@ function render_zone(){
   line.type = THREE.LinePieces;
   scene.add( line );
 
-  var z = gen_zone_geometry();
 
-  // plane has the same dimensions as the floor
+  // Plane
+  // I think this is the one that we use to color the mesh for the visualization
   var margin = {
     'x': mrt.room.width / 20,
     'y': mrt.room.depth / 20,
   }
-  var aspect_ratio = mrt.room.width / mrt.room.depth;
-  var Nx = Math.floor(26.0 * aspect_ratio);
+  var aspect_ratio = mrt.room.width / mrt.room.depth; //why do we need this "aspect_ratio" thing?... is this part of auto-scale?
+  var Nx = Math.floor(26.0 * aspect_ratio); //whats with the capical "N" all the time!!??
   var Ny = Math.floor(26.0 / aspect_ratio);
   var plane_geometry = new THREE.PlaneGeometry( mrt.room.width - margin.x, mrt.room.depth - margin.y, Nx, Ny );
 
@@ -542,29 +581,32 @@ function render_zone(){
   plane = new THREE.Mesh( plane_geometry, material );
   plane.rotation.x = Math.PI / 2;
   plane.position.x = mrt.room.width / 2;
-  plane.position.y = (mrt.occupant.posture == 'seated') ? 0.6 : 1.1;
+  plane.position.y = (mrt.occupant.posture == 'seated') ? 0.6 : 1.1; //this is an if statement. if seated use 0.6, else use 1.1... we can change this to be gridHeight instead
   plane.position.z = mrt.room.depth / 2;
   plane.geometry.dynamic = true; // so that we can change the vertex colors
   plane.name = "visualization";
   scene.add( plane );
-  plane.updateMatrixWorld();
+  plane.updateMatrixWorld(); //what is updateMatrixWorld???
+
+
+
+  //the next 70ish lines are only about the wall panel(s) per wall
 
   // Surfaces
-
-  var Np = z.length;
+  var Np = z.length; //I assume this is a lazy convention for Numberpanels?
   var thetax, thetaz
   for (var i = 0; i < Np; i++){
-    var p = z[i];
-    var wall = wallPanelGeometry(p.vertices);
+    var p = z[i]; //blah.... why p and why z??? should be for (p)wallItem in (z)wallItems
+    var wall = wallPanelGeometry(p.vertices); //wait... no... really? we are calling "wall" for the wall panel??? cant be!!
 
-    if (p.children.length > 0){
+    if (p.children.length > 0){ //what are p (wall item) children??? ah, they are the panel(s)... weird but ok... should just be wallPanels...
 
-      wall.computeFaceNormals();
-      var n0 = wall.faces[0].normal;
+      wall.computeFaceNormals(); //what/where is computeFaceNormals()?
+      var n0 = wall.faces[0].normal; //I guess this gives us the face normal?
 
       var arg = Math.pow(n0.x, 2) + Math.pow(n0.z, 2)
       if (arg == 0){
-        thetay = 0;
+        thetay = 0; //theta y
       } else {
         thetay = Math.acos( n0.z / arg );
       }
@@ -576,13 +618,14 @@ function render_zone(){
         thetax = Math.acos( n0.z / arg );
       }
 
+
       var t = new THREE.Matrix4();
       var u = new THREE.Matrix4();
       var ti = new THREE.Matrix4();
-      t.makeRotationX( thetax );
-      u.makeRotationY( thetay );
-      t.multiply( u );
-      ti.getInverse( t );
+      t.makeRotationX( thetax ); //where is makeRotationX? looks like it is a function if THREE.Matrix4... which is probably a threejs method?
+      u.makeRotationY( thetay ); //same here
+      t.multiply( u ); // and here
+      ti.getInverse( t ); //and here....
 
       // height translation to be applied later
       var h = new THREE.Matrix4();
@@ -620,11 +663,8 @@ function render_zone(){
     }
 
     // wall texture
-    //var wall_texture = THREE.ImageUtils.loadTexture( 'img/wall1.jpg' );
     var material = new THREE.MeshPhongMaterial( {
         color: 0xffffff,
-        //map: wall_texture,
-        //bumpMap: wall_texture,
         reflectivity: 100,
         transparent: true,
         opacity: 1.0,
@@ -1061,7 +1101,7 @@ function init() {
     .onFinishChange(function(){ do_fast_stuff(); });
 
   gui.add(params, 'setGlobalSurfaceTemp').min(tempMin).max(tempMax).step(1)
-    .onFinishChange(function(){ link_temps(); });  
+    .onFinishChange(function(){ link_temps(); });
 
   gui.add(params, 'update');
 
@@ -1096,7 +1136,7 @@ function init() {
     panel_floor_xpos.max(mrt.room.width - 2* panelBorderMin);
     panel_floor_ypos.max(mrt.room.depth - 2* panelBorderMin);
   };
-  
+
   function link_temps(){
     params.wall1.temperature = params.setGlobalSurfaceTemp;
     set_surface_property('wall1', 'temperature', params.wall1.temperature, false);
@@ -1112,15 +1152,15 @@ function init() {
     set_surface_property('ceiling', 'temperature', params.ceiling.temperature, false);
     params.floor.temperature = params.setGlobalSurfaceTemp;
     set_surface_property('floor', 'temperature', params.floor.temperature, false);
-     
+
     //update gui displays to match values stored in fields
     _.each([f_wall1, f_wall2, f_wall3, f_wall4, f_floor, f_ceiling], function(g){
         g.updateDisplay();
     });
-    
-    do_fast_stuff();       
+
+    do_fast_stuff();
   };
-  
+
   // Lights
   var ambientLight = new THREE.AmbientLight( 0x999999 );
   scene.add( ambientLight );
