@@ -701,6 +701,7 @@ function render_zone(){
 init();
 animate();
 
+//initialize
 function init() {
 
   container = document.createElement( 'div' );
