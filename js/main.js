@@ -688,7 +688,7 @@ function render_zone(){
     scene.add(mesh);
     surfaces.push(mesh);
 
-    setOpacity(params.opacity);
+    setOpacity(params.opacity); // ok.. I guess this is important
 
     // edges
     var egh = new THREE.EdgesHelper(mesh, 0x444444);
@@ -698,15 +698,18 @@ function render_zone(){
   }
 }
 
+//call init and animate
 init();
 animate();
 
-//initialize
+//initialize the camera, the arrow, the N text, the sun (sort of), and the GUI
+//delete the GUI but keep the objects that reference the properties of the objects
+//and remember to keep the update function
 function init() {
 
   container = document.createElement( 'div' );
   document.body.appendChild( container );
-  camera = new THREE.CombinedCamera( window.innerWidth / 2, window.innerHeight / 2, 70, 1, 3000, - 500, 1000 );
+  camera = new THREE.CombinedCamera( window.innerWidth / 2, window.innerHeight / 4, 70, 1, 3000, - 500, 1000 );
   camera.position.x = -6.0;
   camera.position.y = 17.0;
   camera.position.z = -6.0;
@@ -1172,19 +1175,19 @@ function init() {
 
   renderer = new THREE.WebGLRenderer( { antialiasing: true } );
   renderer.setClearColor( 0xf0f0f0 );
-  renderer.setSize( window.innerWidth, window.innerHeight );
+  renderer.setSize( window.innerWidth, window.innerHeight / 2 );
 
   controls = new THREE.OrbitControls(camera, renderer.domElement);
 
   container.appendChild( renderer.domElement );
 
   window.addEventListener( 'resize', onWindowResize, false );
-  document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+  document.addEventListener( 'mousemove', onDocumentMouseMove, false ); //this shows the properties of the grid based on mouse pt
 
   function onWindowResize(){
-    camera.setSize( window.innerWidth, window.innerHeight );
+    camera.setSize( window.innerWidth, window.innerHeight /2 );
     camera.updateProjectionMatrix();
-    renderer.setSize( window.innerWidth, window.innerHeight );
+    renderer.setSize( window.innerWidth, window.innerHeight /2);
   }
   set_wall_properties();
   render_zone();
@@ -1216,6 +1219,7 @@ function do_fast_stuff(){
   update_visualization();
 };
 
+//makes all the walls invisible
 function setOpacity(opacity){
   for (var i = 0; i < scene.children.length; i++){
     var ch = scene.children[i];
@@ -1225,6 +1229,7 @@ function setOpacity(opacity){
   }
 }
 
+//mesh color properties based on mouse pt... just looks for the mouse pt
 function onDocumentMouseMove( event ) {
   event.preventDefault();
   mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
