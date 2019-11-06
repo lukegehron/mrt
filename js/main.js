@@ -163,6 +163,8 @@ params = {
   }
 };
 
+
+
 let ceilingHeightValue = document.getElementById("ceiling").value;
 document.getElementsByName("ceiling")[0].addEventListener('input', updateRoom);
 
@@ -191,7 +193,7 @@ Hour = document.getElementById("hour").value;
 document.getElementsByName("hour")[0].addEventListener('input', updateLocation);
 
 myNorth = document.getElementById("north").value;
-document.getElementsByName("north")[0].addEventListener('input', updateLocation);
+document.getElementsByName("north")[0].addEventListener('input', updateArrow);
 
 var view_factors;
 var panelBorderMin = 0.1 // minimum distance from panel edge to surface edge
@@ -1001,6 +1003,10 @@ function render_zone() {
 //call init and animate
 init();
 animate();
+updateLocation();
+updateRoom();
+
+// calculate_all(true);
 
 function updateRoom() {
   wallDepVal = document.getElementById("rmDep").value;
@@ -1016,6 +1022,12 @@ function updateRoom() {
   update_visualization();
 }
 
+//update arrowHelper
+function updateArrow(){
+  myNorth = document.getElementById("north").value;
+  arrowHelper.rotation.y = myNorth*0.017453292; //3.1415926/180
+  //sun.rotation.y = myNorth/3.17/18;
+}
 
 
 function updateLocation() {
@@ -1068,7 +1080,7 @@ function init() {
   var length = 3;
   var hex = 0x000000;
 
-  var arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex, 0.3, 0.3);
+  arrowHelper = new THREE.ArrowHelper(dir, origin, length, hex, 0.3, 0.3);
   scene.add(arrowHelper);
 
   var textGeo = new THREE.TextGeometry("N", {
@@ -1823,30 +1835,34 @@ function update_shortwave_components() {
   // sun.position.z = solarcal.skydome_center.z + r * Math.sin(alt_rad) * Math.sin(az_rad);
 
   //alt_rad =
+  let myDep = parseInt(mrt.room.depth);
+  let depMult = 1.25;
 
   if(sunChecked == true){
     var sunArray = [];
     update_zone();
+
+
 
     for(var i = 0; i<dateArray.length; i++){
       var sunGeometry = new THREE.SphereGeometry(0.2, 11, 11);
       var sunMaterial = new THREE.MeshLambertMaterial({
         color: 0xff0000,
         opacity: 0.01,
-        emissive: 0xffff00
+        emissive: 0xBBBBBB
       });
       alt_rad1 = Math.PI / 2 - Math.PI * solar.position(dateArray[i])[1] / 180;
       az_rad1 = Math.PI * solar.position(dateArray[i])[0] / 180;
       sunArray.push(new THREE.Mesh(sunGeometry, sunMaterial));
       scene.add(sunArray[i]);
-      sunArray[i].position.x = 10 * Math.sin(alt_rad1) * Math.cos(az_rad1);
-      if(10 * Math.cos(alt_rad1) > 0){
-        sunArray[i].position.y = 10 * Math.cos(alt_rad1);
+      sunArray[i].position.x = myDep*depMult * Math.sin(alt_rad1) * Math.cos(az_rad1);
+      if(myDep*depMult * Math.cos(alt_rad1) > 0){
+        sunArray[i].position.y = myDep*depMult * Math.cos(alt_rad1);
       }else{
         sunArray[i].position.y = 10000;
       }
 
-      sunArray[i].position.z = 10 * Math.sin(alt_rad1) * Math.sin(az_rad1)+3;
+      sunArray[i].position.z = myDep*depMult * Math.sin(alt_rad1) * Math.sin(az_rad1)+myDep/2;
     }
   }
   else{
@@ -1856,9 +1872,10 @@ function update_shortwave_components() {
 
 
 
-  sun.position.x = 10 * Math.sin(alt_rad) * Math.cos(az_rad);
-  sun.position.y = 10 * Math.cos(alt_rad);
-  sun.position.z = 10 * Math.sin(alt_rad) * Math.sin(az_rad)+3;
+  sun.position.x = myDep*depMult * Math.sin(alt_rad) * Math.cos(az_rad);
+  sun.position.y = myDep*depMult * Math.cos(alt_rad);
+  sun.position.z = myDep*depMult * Math.sin(alt_rad) * Math.sin(az_rad)+myDep/2;
+  //sun.rotation.y = myNorth/3.17/18;
 
   // arrowHelper.rotation.y = myNorth;
 
